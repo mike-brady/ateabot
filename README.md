@@ -14,9 +14,9 @@ There are 4 parts to the command.
 
 1. **Username Tag** - Required. Tag me by username. This is how I get notified of your request.
 2. **Command** - Optional. The command you would like me to perform. If omitted, I will perform the **List** command by default. I can perform the following commands:
-   1. **List** - Respond with abbreviations found in the input text and list them with their expansions in table format.
-   2. **Explain** - Respond with the input text, putting the expansion of each abbreviation in parenthesis.
-   3. **Expand** - Respond with the input text, replacing the abbreviations with their expansions.
+   * **List** - Respond with abbreviations found in the input text and list them with their expansions in table format.
+   * **Explain** - Respond with the input text, putting the expansion of each abbreviation in parenthesis.
+   * **Expand** - Respond with the input text, replacing the abbreviations with their expansions.
 3. **Colon** - Only required if input text is provided.
 4. **Input Text** - Optional. The text you want me to find abbreviations in. If omitted, I will use the parent comment or post that you replied to as the input text.
 
