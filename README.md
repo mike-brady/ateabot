@@ -24,7 +24,7 @@ There are 4 parts to the command.
 
 |**Command**|**Action**|
 |:-|:-|
-|u/ateabot|I will **List** all abbreviations I find in the comment or post you are replied to.|
+|u/ateabot|I will **List** all abbreviations I find in the comment or post you replied to.|
 |u/ateabot explain|I will **Explain** the text from the comment or post you replied to.|
 |u/ateabot expand|I will **Expand** the text from the comment or post you replied to.|
 |u/ateabot : ITT|I will **List** all abbreviations I find in the input text \"ITT\" you provided.|
