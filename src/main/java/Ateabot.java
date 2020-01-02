@@ -3,9 +3,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import com.mysql.cj.jdbc.SuspendableXAConnection;
 
-import java.awt.*;
 import java.io.*;
 import java.net.URISyntaxException;
 import java.sql.SQLException;
@@ -38,6 +36,12 @@ public class Ateabot {
     private int ratelimit_remaining;
     private int ratelimit_reset;
 
+    // Tasks
+    boolean respond;
+    boolean removeNegativeComments;
+    int removeCommentThreshold;
+    boolean terminate;
+
     private Atea atea;
 
     public Ateabot(Atea atea) throws SQLException, IOException {
@@ -64,14 +68,51 @@ public class Ateabot {
         } catch (IOException | URISyntaxException | InterruptedException ex) {
             ex.printStackTrace();
         }
+
+        getTasks();
     }
 
     public void run() throws InterruptedException, IOException, URISyntaxException {
-        boolean endCondition = false;
-        while(!endCondition) {
-            ArrayList<String> usernameMentions = getUsernameMentions();
+        while(!terminate) {
+            getTasks();
+
+            if(respond) {
+                ArrayList<String> usernameMentions = getUsernameMentions();
+            }
+
+            if(removeNegativeComments) {
+                System.out.println("REMOVING COMMENTS WITH A SCORE OF " + removeCommentThreshold + " OR BELOW");
+            }
+
             Thread.sleep(1000);
-            //endCondition = true;
+        }
+
+        System.out.println("Terminating...");
+    }
+
+    private void getTasks() throws IOException {
+        Properties control = new Properties();
+        control.load(getClass().getResourceAsStream("control.txt"));
+        String respond = control.getProperty("respond");
+        if(respond != null && respond.equals("true")) {
+            this.respond = true;
+        } else {
+            this.respond = false;
+        }
+
+        try {
+            removeCommentThreshold = Integer.parseInt(control.getProperty("removeNegativeComments"));
+            removeNegativeComments = true;
+        }
+        catch(NumberFormatException E) {
+            removeNegativeComments = false;
+        }
+
+        String terminate = control.getProperty("terminate");
+        if(terminate != null && terminate.equals("true")) {
+            this.terminate = true;
+        } else {
+            this.terminate = false;
         }
     }
 
