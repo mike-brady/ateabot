@@ -1,3 +1,4 @@
-#respond=true
-removeNegativeComments = -2
-terminate=true
+#terminate=true
+
+respond=true
+removeNegativeComments = -1
