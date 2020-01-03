@@ -72,6 +72,12 @@ public class Ateabot {
         getTasks();
     }
 
+    /**
+     * Starts Ateabot running continuously. Only stops when terminate is set to true.
+     * @throws InterruptedException
+     * @throws IOException
+     * @throws URISyntaxException
+     */
     public void run() throws InterruptedException, IOException, URISyntaxException {
         while(!terminate) {
             getTasks();
@@ -81,13 +87,47 @@ public class Ateabot {
             }
 
             if(removeNegativeComments) {
-                System.out.println("REMOVING COMMENTS WITH A SCORE OF " + removeCommentThreshold + " OR BELOW");
+                removeNegativeComments();
             }
 
             Thread.sleep(1000);
         }
 
         System.out.println("Terminating...");
+    }
+
+    private boolean connectToReddit() throws IOException, URISyntaxException, InterruptedException {
+        conn = new HttpConn();
+        startRequest("https://www.reddit.com/api/v1/access_token", "POST");
+        conn.setAuthHeader(client_id, "YXA8GdyVPSU8y-5kvgPjjpNJXUc");
+        conn.setParam("grant_type", "password");
+        conn.setParam("username", username);
+        conn.setParam("password", "C7@daRBZ!F3VX9Hh");
+        int responseCode = sendRequest();
+
+        if(responseCode != 200) {
+            return false;
+        }
+
+        String content = conn.getBody();
+        System.out.println(content);
+        JsonElement jsonTree = JsonParser.parseString(content);
+        if(jsonTree.isJsonObject()) {
+            JsonObject jsonObject = jsonTree.getAsJsonObject();
+            this.access_token = jsonObject.get("access_token").getAsString();
+            this.token_type = jsonObject.get("token_type").getAsString();
+            Date d = new Date();
+            long now = d.getTime();
+            long expires_secs = jsonObject.get("expires_in").getAsLong();
+            this.access_expires = now + expires_secs*1000;
+
+            System.out.println("           Access Token: ****************");
+            System.out.println("             Expires In: " + expires_secs/60 + " minutes");
+        }
+
+
+
+        return true;
     }
 
     private void getTasks() throws IOException {
@@ -217,6 +257,26 @@ public class Ateabot {
         return new ArrayList<String>();
     }
 
+    private void removeNegativeComments() throws InterruptedException, IOException, URISyntaxException {
+        String content = get("user/" + username + "/comments");
+        JsonElement jsonTree = JsonParser.parseString(content);
+        if(jsonTree.isJsonObject()) {
+            JsonObject jsonObject = jsonTree.getAsJsonObject();
+            JsonArray children = jsonObject.get("data").getAsJsonObject().get("children").getAsJsonArray();
+            for(JsonElement item : children) {
+                JsonObject itemData = item.getAsJsonObject().get("data").getAsJsonObject();
+                int score = itemData.get("score").getAsInt();
+                String commentId = itemData.get("name").getAsString();
+                if(score <= removeCommentThreshold) {
+                    System.out.println("removing comment.");
+                    ArrayList<String[]> params = new ArrayList<>();
+                    params.add(new String[]{"id", commentId});
+                    post("api/del", params);
+                }
+            }
+        }
+    }
+
     private String getContentById(String subreddit, String id) throws InterruptedException, IOException, URISyntaxException {
         String content = get("r/" + subreddit + "/api/info?id=" + id);
         JsonElement jsonTree = JsonParser.parseString(content);
@@ -236,41 +296,7 @@ public class Ateabot {
         return "";
     }
 
-    public boolean connectToReddit() throws IOException, URISyntaxException, InterruptedException {
-        conn = new HttpConn();
-        startRequest("https://www.reddit.com/api/v1/access_token", "POST");
-        conn.setAuthHeader(client_id, "YXA8GdyVPSU8y-5kvgPjjpNJXUc");
-        conn.setParam("grant_type", "password");
-        conn.setParam("username", username);
-        conn.setParam("password", "C7@daRBZ!F3VX9Hh");
-        int responseCode = sendRequest();
-
-        if(responseCode != 200) {
-            return false;
-        }
-
-        String content = conn.getBody();
-        System.out.println(content);
-        JsonElement jsonTree = JsonParser.parseString(content);
-        if(jsonTree.isJsonObject()) {
-            JsonObject jsonObject = jsonTree.getAsJsonObject();
-            this.access_token = jsonObject.get("access_token").getAsString();
-            this.token_type = jsonObject.get("token_type").getAsString();
-            Date d = new Date();
-            long now = d.getTime();
-            long expires_secs = jsonObject.get("expires_in").getAsLong();
-            this.access_expires = now + expires_secs*1000;
-
-            System.out.println("           Access Token: ****************");
-            System.out.println("             Expires In: " + expires_secs/60 + " minutes");
-        }
-
-
-
-        return true;
-    }
-
-    public String findAbbreviationExample(String subreddit) throws IOException, URISyntaxException, InterruptedException {
+    private String findAbbreviationExample(String subreddit) throws IOException, URISyntaxException, InterruptedException {
         get("r/" + subreddit + "/comments/");
         String content = conn.getBody();
         JsonElement jsonTree = JsonParser.parseString(content);
