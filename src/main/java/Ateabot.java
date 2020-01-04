@@ -89,8 +89,6 @@ public class Ateabot {
             if(removeNegativeComments) {
                 removeNegativeComments();
             }
-
-            Thread.sleep(1000);
         }
 
         System.out.println("Terminating...");
@@ -342,13 +340,19 @@ public class Ateabot {
     }
 
     private int sendRequest() throws InterruptedException, IOException, URISyntaxException {
-        // Globally delay all requests slightly to mitigate risk of exceeding rate limit.
-        // Rate limit checks should still be done locally.
-        Thread.sleep(100);
         return sendRequest(true);
     }
 
     private int sendRequest(boolean output) throws InterruptedException, IOException, URISyntaxException {
+        // Delay all requests by calculated number of milliseconds to stay within rate limit
+        int sleepDuration = (int) (((float) ratelimit_reset / (float) ratelimit_remaining) * 1000f);
+
+        // Minimum time between requests
+        sleepDuration = Integer.max(100, sleepDuration);
+
+        System.out.println("Sleeping for " + sleepDuration + " milliseconds");
+        Thread.sleep(sleepDuration);
+
         if(output) {
             System.out.println("\n" + conn.getRequestMethod() + ": " + conn.getRequestUri());
         }
