@@ -10,6 +10,7 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.Properties;
+import java.util.Scanner;
 
 public class Ateabot {
     private Properties properties;
@@ -22,6 +23,7 @@ public class Ateabot {
     private String version_url;
 
     private String username;
+    private String password;
     private String client_id;
     private String comment_footer;
     private String user_agent;
@@ -37,6 +39,8 @@ public class Ateabot {
     private int ratelimit_reset;
 
     // Tasks
+    boolean train;
+    String trainSubreddit;
     boolean respond;
     boolean removeNegativeComments;
     int removeCommentThreshold;
@@ -57,6 +61,7 @@ public class Ateabot {
         version_url = "https://www.reddit.com/r/ateabot/comments/eh6w6o/version_history/";
 
         username = properties.getProperty("reddit_username");;
+        password = properties.getProperty("reddit_password");
         client_id =  properties.getProperty("reddit_client_id");;
         comment_footer = "\n\n[^(v"+version+")]("+version_url+") ^(|) [^(about)]("+about_url+") ^(|) [^(feedback)]("+feedback_url+")";
 
@@ -82,12 +87,16 @@ public class Ateabot {
         while(!terminate) {
             getTasks();
 
-            if(respond) {
-                ArrayList<String> usernameMentions = getUsernameMentions();
-            }
+            if(train) {
+                train(trainSubreddit);
+            } else {
+                if (respond) {
+                    ArrayList<String> usernameMentions = getUsernameMentions();
+                }
 
-            if(removeNegativeComments) {
-                removeNegativeComments();
+                if (removeNegativeComments) {
+                    removeNegativeComments();
+                }
             }
         }
 
@@ -100,7 +109,7 @@ public class Ateabot {
         conn.setAuthHeader(client_id, "YXA8GdyVPSU8y-5kvgPjjpNJXUc");
         conn.setParam("grant_type", "password");
         conn.setParam("username", username);
-        conn.setParam("password", "C7@daRBZ!F3VX9Hh");
+        conn.setParam("password", password);
         int responseCode = sendRequest();
 
         if(responseCode != 200) {
@@ -131,12 +140,11 @@ public class Ateabot {
     private void getTasks() throws IOException {
         Properties control = new Properties();
         control.load(getClass().getResourceAsStream("control.txt"));
-        String respond = control.getProperty("respond");
-        if(respond != null && respond.equals("true")) {
-            this.respond = true;
-        } else {
-            this.respond = false;
-        }
+
+        train = getBooleanProperty(control, "train");
+        trainSubreddit = control.getProperty("trainSubreddit");
+        respond = getBooleanProperty(control, "respond");
+        terminate = getBooleanProperty(control, "terminate");
 
         try {
             removeCommentThreshold = Integer.parseInt(control.getProperty("removeNegativeComments"));
@@ -145,22 +153,25 @@ public class Ateabot {
         catch(NumberFormatException E) {
             removeNegativeComments = false;
         }
-
-        String terminate = control.getProperty("terminate");
-        if(terminate != null && terminate.equals("true")) {
-            this.terminate = true;
-        } else {
-            this.terminate = false;
-        }
     }
 
-    private String get(String url) throws InterruptedException, IOException, URISyntaxException {
+    private boolean getBooleanProperty(Properties properties, String key) {
+        String value = properties.getProperty(key);
+        if(value != null && value.equals("true")) {
+            return true;
+        }
+
+        return false;
+    }
+
+    private Response get(String url) throws InterruptedException, IOException, URISyntaxException {
         startRequest("https://oauth.reddit.com/" + url, "GET");
         conn.setHeader("Authorization", "bearer " + access_token);
         int responseCode = sendRequest();
 
         String headers = conn.stringifyHeaders();
-        return conn.getBody();
+        String body =  conn.getBody();
+        return new Response(responseCode, headers, body);
     }
 
     private Response post(String url, ArrayList<String[]> params) throws InterruptedException, IOException, URISyntaxException {
@@ -168,7 +179,6 @@ public class Ateabot {
         conn.setHeader("Authorization", "bearer " + access_token);
         for(String[] param : params) {
             conn.setParam(param[0], param[1]);
-            System.out.println(param[0] + ":" + param[1]);
         }
         int responseCode = sendRequest();
 
@@ -178,7 +188,7 @@ public class Ateabot {
     }
 
     private ArrayList<String> getUsernameMentions() throws InterruptedException, IOException, URISyntaxException {
-        String content = get("/message/unread");
+        String content = get("message/unread").getBody();
         JsonElement jsonTree = JsonParser.parseString(content);
         if(jsonTree.isJsonObject()) {
             JsonObject jsonObject = jsonTree.getAsJsonObject();
@@ -219,7 +229,7 @@ public class Ateabot {
                         response = atea.expand(input);
                     } else {
                         if (input.length() > 0) {
-                            ArrayList<Abbreviation> abbrs = atea.getAbbreviations(input, true);
+                            ArrayList<Abbreviation> abbrs = atea.predictAbbreviations(input);
                             response = abbrs.size() + " abbreviation";
                             if (abbrs.size() != 1) {
                                 response += "s";
@@ -232,7 +242,7 @@ public class Ateabot {
 
                                 Expansion expansion = abbr.getBestExpansion();
                                 response += expansion.getValue() + "|";
-                                response += expansion.getConfidence() + "|";
+                                response += expansion.getConfidence()+"|";
                             }
                         }
                     }
@@ -256,7 +266,7 @@ public class Ateabot {
     }
 
     private void removeNegativeComments() throws InterruptedException, IOException, URISyntaxException {
-        String content = get("user/" + username + "/comments");
+        String content = get("user/" + username + "/comments").getBody();
         JsonElement jsonTree = JsonParser.parseString(content);
         if(jsonTree.isJsonObject()) {
             JsonObject jsonObject = jsonTree.getAsJsonObject();
@@ -276,7 +286,7 @@ public class Ateabot {
     }
 
     private String getContentById(String subreddit, String id) throws InterruptedException, IOException, URISyntaxException {
-        String content = get("r/" + subreddit + "/api/info?id=" + id);
+        String content = get("r/" + subreddit + "/api/info?id=" + id).getBody();
         JsonElement jsonTree = JsonParser.parseString(content);
         if(jsonTree.isJsonObject()) {
             JsonObject jsonObject = jsonTree.getAsJsonObject();
@@ -294,44 +304,55 @@ public class Ateabot {
         return "";
     }
 
-    private String findAbbreviationExample(String subreddit) throws IOException, URISyntaxException, InterruptedException {
-        get("r/" + subreddit + "/comments/");
-        String content = conn.getBody();
+    public void train(String subreddit) throws IOException, URISyntaxException, InterruptedException {
+        Scanner scnr = new Scanner(System.in);
+        Response response = get("r/" + subreddit + "/comments/");
+        String content = response.getBody();
         JsonElement jsonTree = JsonParser.parseString(content);
         if(jsonTree.isJsonObject()) {
             JsonObject jsonObject = jsonTree.getAsJsonObject();
             JsonArray comments = jsonObject.get("data").getAsJsonObject().get("children").getAsJsonArray();
             for(JsonElement comment : comments) {
+
                 JsonObject commentData = comment.getAsJsonObject().get("data").getAsJsonObject();
                 String commentBody = commentData.get("body").getAsString();
-                ArrayList<Abbreviation> abbrs = atea.getAbbreviations(commentBody, true);
+                ArrayList<Abbreviation> abbrs = atea.predictAbbreviations(commentBody);
                 for(Abbreviation abbr : abbrs) {
                     System.out.println("\nPossible Abbreviation: \033[1m" + abbr.getValue() + "\033[0m");
-                    System.out.println("Context: " + abbr.getContext().toString(true));
+                    System.out.println("Context: " + abbr.getText());
                     System.out.println("Permalink: https://www.reddit.com" + commentData.get("permalink").getAsString());
                     System.out.println("Possible Expansions: ");
                     for(Expansion expansion : abbr.getExpansions()) {
                         System.out.println(expansion.getValue() + " : " + expansion.getConfidence());
                     }
+                    System.out.print("Is this an abbreviation? (y/n): ");
+                    if(scnr.nextLine().equals("y")) {
+                        for(Expansion expansion : abbr.getExpansions()) {
+                            System.out.print("Does this abbreviation stand for \"" + expansion.getValue() + "\"? (y/n): ");
+                            if(scnr.nextLine().equals("y")) {
+                                atea.addExample(abbr, expansion);
+                                break;
+                            }
+                        }
+                    }
                 }
+
             }
         }
-
-        return content;
     }
 
-//    public boolean disconnect() throws IOException {
-//        HttpConn conn = startConn("https://www.reddit.com/api/v1/revoke_token");
-//        conn.setParam("token", access_token);
-//        conn.setParam("token_type_hint", "access_token");
-//
-//        String responseCode = conn.sendRequest("POST");
-//        if(responseCode.equals("204")) {
-//            return true;
-//        }
-//
-//        return false;
-//    }
+    public boolean disconnect() throws IOException, URISyntaxException, InterruptedException {
+        ArrayList<String[]> params = new ArrayList<>();
+        params.add(new String[]{"token", access_token});
+        params.add(new String[]{"token_type_hint", "access_token"});
+        Response response = post("api/v1/revoke_token", params);
+
+        if(response.getResponseCode() == 204) {
+            return true;
+        }
+
+        return false;
+    }
 
     private void startRequest(String uri, String method) {
         conn.startRequest(uri, method);

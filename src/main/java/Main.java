@@ -18,28 +18,6 @@ public class Main {
         Atea atea = new Atea(host, username, password);
         Ateabot ateabot = new Ateabot(atea);
         ateabot.run();
-
-//        boolean quit = false;
-//        long maxSearchTime = 300;
-//        Date d = new Date();
-//        long now;
-//        long start = d.getTime()/1000;
-//        while(!quit) {
-//            ateabot.findAbbreviationExample("all");
-//            Scanner scnr = new Scanner(System.in);  // Create a Scanner object
-//            d = new Date();
-//            now = d.getTime()/1000;
-//            if(now > start + maxSearchTime) {
-//                System.out.print("Continue? (y/n): ");
-//                if (!scnr.nextLine().equals("y")) {
-//                    quit = true;
-//                } else {
-//                    d = new Date();
-//                    start = d.getTime()/1000;
-//                }
-//            }
-//        }
-
-        //ateabot.disconnect();
+        ateabot.disconnect();
     }
 }
