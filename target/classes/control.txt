@@ -1,4 +1,8 @@
 #terminate=true
 
+# when training is turned on, ateabot will ONLY train and not run any other operations at the same time
+#train=true
+trainSubreddit=all
+
 respond=true
-removeNegativeComments = -1
+removeNegativeComments = 2
